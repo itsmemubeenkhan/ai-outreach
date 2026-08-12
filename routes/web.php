@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HotLeadController;
 use App\Http\Controllers\InboxController;
 use App\Http\Controllers\LeadController;
+use App\Http\Controllers\LeadSalesInsightController;
 use App\Http\Controllers\LeadImportController;
 use App\Http\Controllers\OutboundEmailController;
 use App\Http\Controllers\PowerDialerController;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('leads', LeadController::class)->except(['show']);
+    Route::get('/leads/{lead}/sales-insight', LeadSalesInsightController::class)->middleware('throttle:20,1')->name('leads.sales-insight');
     Route::get('/dialer', [PowerDialerController::class, 'index'])->name('dialer.index');
     Route::post('/dialer/start', [PowerDialerController::class, 'start'])->name('dialer.start');
     Route::get('/dialer/{dialerSession}/state', [PowerDialerController::class, 'state'])->name('dialer.state');

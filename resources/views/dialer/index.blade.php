@@ -13,14 +13,16 @@
             <div class="grid gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
                 <aside class="space-y-5">
                     <section class="rounded-2xl border bg-white p-6 shadow-sm">
-                        <div class="text-xs font-bold uppercase tracking-wider text-indigo-600">AI Sales Assistant</div>
-                        <h2 class="mt-2 text-xl font-black text-slate-950">{{ $recommendation['headline'] }}</h2>
-                        <p class="mt-3 text-sm text-slate-600">{{ $recommendation['opening'] }}</p>
-                        <h3 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">What to sell</h3>
-                        <ul class="mt-2 space-y-2 text-sm">@foreach($recommendation['offers'] as $offer)<li class="rounded-lg bg-indigo-50 px-3 py-2 text-indigo-950">{{ $offer }}</li>@endforeach</ul>
-                        <h3 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">Lead signals</h3>
-                        <ul class="mt-2 space-y-2 text-sm text-slate-700">@foreach($recommendation['signals'] as $signal)<li>• {{ $signal }}</li>@endforeach</ul>
-                        <p class="mt-4 text-[11px] text-slate-400">Recommendation uses CRM lead data and category rules; it does not claim to have analyzed website content.</p>
+                        <div class="flex items-center justify-between"><div class="text-xs font-bold uppercase tracking-wider text-indigo-600">Runtime AI Sales Assistant</div><span id="ai-provider" class="text-[10px] font-bold text-slate-400">OPENROUTER</span></div>
+                        <div id="ai-loading" class="mt-5 text-sm text-slate-500">Reading the website and generating a grounded recommendation…</div>
+                        <div id="ai-error" class="mt-5 hidden rounded-lg bg-rose-50 p-3 text-sm text-rose-700"></div>
+                        <div id="ai-result" class="hidden">
+                            <h2 id="ai-best-offer" class="mt-3 text-xl font-black text-slate-950"></h2>
+                            <p id="ai-summary" class="mt-3 text-sm text-slate-600"></p>
+                            <h3 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">Why this offer</h3><ul id="ai-reasons" class="mt-2 space-y-2 text-sm text-slate-700"></ul>
+                            <h3 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">Opening pitch</h3><p id="ai-opening" class="mt-2 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-950"></p>
+                            <h3 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-500">Discovery questions</h3><ul id="ai-questions" class="mt-2 space-y-2 text-sm text-slate-700"></ul>
+                        </div>
                     </section>
 
                     <section class="rounded-2xl border bg-white p-6 shadow-sm">
@@ -47,8 +49,8 @@
                     </section>
 
                     <section class="overflow-hidden rounded-2xl border bg-white shadow-sm">
-                        <div class="flex items-center justify-between border-b p-4"><div><h2 class="font-black">Lead website</h2><p class="text-xs text-slate-500">Loaded for research during the 30-second pause.</p></div>@if($websiteUrl)<a href="{{ $websiteUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Open full website ↗</a>@endif</div>
-                        @if($websiteUrl)<iframe src="{{ $websiteUrl }}" title="{{ $lead?->business_name }} website" class="h-[520px] w-full bg-white" sandbox="allow-forms allow-scripts allow-same-origin allow-popups" referrerpolicy="no-referrer"></iframe><p class="border-t p-3 text-xs text-slate-500">If the website blocks embedded previews, use “Open full website”.</p>@else<div class="p-12 text-center text-slate-500">No valid website is saved for this lead.</div>@endif
+                        <div class="flex items-center justify-between border-b p-4"><div><h2 class="font-black">Website intelligence</h2><p class="text-xs text-slate-500">Server-read content replaces blocked iframe previews.</p></div>@if($websiteUrl)<a href="{{ $websiteUrl }}" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white">Open full website ↗</a>@endif</div>
+                        <div id="website-intelligence" class="p-6 text-sm text-slate-500">Reading website content…</div>
                     </section>
 
                     <section id="disposition-panel" class="hidden rounded-2xl border bg-white p-6"><h3 class="font-black">Call outcome</h3><form id="disposition-form" method="POST" class="mt-4 grid gap-3 md:grid-cols-2">@csrf<select name="disposition" class="rounded-xl border-slate-200">@foreach(['answered','no_answer','busy','callback','interested','wrong_number','not_interested'] as $value)<option value="{{ $value }}">{{ str($value)->replace('_',' ')->title() }}</option>@endforeach</select><input name="notes" placeholder="Call notes" class="rounded-xl border-slate-200"><button class="rounded-xl bg-slate-900 px-4 py-3 font-bold text-white md:col-span-2">Save & Load Next Lead</button></form></section>
@@ -62,6 +64,10 @@
     @if($session?->currentLead)
         <script>
             const dialButton = document.getElementById('dial-button'); let activeCallId = null; let pollTimer = null;
+            const listItems=(values)=>Array.isArray(values)?values.map(value=>`<li class="rounded-lg bg-slate-50 px-3 py-2">${escapeHtml(String(value))}</li>`).join(''):'';
+            function escapeHtml(value){const node=document.createElement('div');node.textContent=value;return node.innerHTML;}
+            const loadInsight=async()=>{try{const response=await fetch(@json(route('leads.sales-insight',$lead)),{headers:{'Accept':'application/json'}});const data=await response.json();if(!response.ok)throw new Error(data.message||'Analysis failed.');document.getElementById('ai-loading').classList.add('hidden');document.getElementById('ai-result').classList.remove('hidden');document.getElementById('ai-best-offer').textContent=data.analysis.best_offer||'Sales recommendation';document.getElementById('ai-summary').textContent=data.analysis.summary||'';document.getElementById('ai-reasons').innerHTML=listItems(data.analysis.reasons);document.getElementById('ai-opening').textContent=data.analysis.opening_pitch||'';document.getElementById('ai-questions').innerHTML=listItems(data.analysis.discovery_questions);const site=data.website;document.getElementById('website-intelligence').innerHTML=`<h3 class="text-xl font-black text-slate-950">${escapeHtml(site.title||'Website content')}</h3><p class="mt-2 text-slate-600">${escapeHtml(site.description||'No meta description found.')}</p><h4 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-400">Pages and service signals</h4><ul class="mt-2 grid gap-2 md:grid-cols-2">${listItems(site.headings)}</ul><h4 class="mt-5 text-xs font-black uppercase tracking-wide text-slate-400">AI website findings</h4><ul class="mt-2 space-y-2">${listItems(data.analysis.website_findings)}</ul>`;}catch(error){document.getElementById('ai-loading').classList.add('hidden');document.getElementById('ai-error').textContent=error.message;document.getElementById('ai-error').classList.remove('hidden');document.getElementById('website-intelligence').textContent=error.message;}};
+            loadInsight();
             const dial = async () => { dialButton.disabled = true; document.getElementById('dialer-status').textContent = 'Calling in Zoom…'; const response = await fetch(@json(route('dialer.dial', $session)), {method:'POST', headers:{'X-CSRF-TOKEN':@json(csrf_token()), 'Accept':'application/json'}}); const data = await response.json(); if(data.dial_url){ activeCallId=data.call_id; document.getElementById('disposition-form').action=@json(url('/calls'))+'/'+data.call_id+'/disposition'; document.getElementById('disposition-panel').classList.remove('hidden'); window.location.href=data.dial_url; pollTimer=setInterval(checkCallState,2000); } else { dialButton.disabled=false; } };
             const checkCallState = async () => { const response=await fetch(@json(route('dialer.state',$session)),{headers:{'Accept':'application/json'}}); const data=await response.json(); if(activeCallId&&data.latest_call?.id===activeCallId&&data.latest_call.status==='completed'){ clearInterval(pollTimer); window.location.href=@json(route('dialer.index')).concat('?auto=1&wait=30'); } };
             dialButton?.addEventListener('click',dial);
