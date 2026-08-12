@@ -14,7 +14,11 @@ class DialerSessionService
             ->whereNotIn('lead_status', ['unsubscribed', 'closed']);
 
         if ($session->category) {
-            $query->where('category', $session->category);
+            if ($query->getConnection()->getDriverName() === 'mysql') {
+                $query->whereRaw("TRIM(SUBSTRING_INDEX(category, ',', 1)) = ?", [$session->category]);
+            } else {
+                $query->where(fn ($categories) => $categories->where('category', $session->category)->orWhere('category', 'like', $session->category.',%'));
+            }
         }
 
         $lead = $query->orderBy('id')->first();

@@ -13,8 +13,10 @@ class LeadSalesInsightController extends Controller
     public function __invoke(Lead $lead, SafeWebsiteReader $reader, OpenRouterLeadAnalyst $analyst)
     {
         try {
-            $result = Cache::remember('lead-sales-insight:v2:'.$lead->id.':'.sha1((string) $lead->website), now()->addDay(), function () use ($lead, $reader, $analyst) {
-                $website = $reader->read($lead->website);
+            $result = Cache::remember('lead-sales-insight:v3:'.$lead->id.':'.sha1((string) $lead->website), now()->addDay(), function () use ($lead, $reader, $analyst) {
+                $website = $lead->website
+                    ? $reader->read($lead->website)
+                    : ['url' => null, 'title' => 'No website', 'description' => 'No website is recorded for this lead.', 'headings' => [], 'text' => 'The prospect does not currently have a website recorded in the CRM.', 'status' => 'missing'];
                 return ['website' => $website, 'analysis' => $analyst->analyze($lead, $website), 'generated_at' => now()->toIso8601String()];
             });
             return response()->json($result);

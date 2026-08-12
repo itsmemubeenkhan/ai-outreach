@@ -21,7 +21,7 @@ class PowerDialerController extends Controller
         $lead = $session?->currentLead;
         $websiteUrl = $this->websiteUrl($lead?->website);
 
-        return view('dialer.index', ['categories' => Lead::whereNotNull('phone')->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'), 'session' => $session, 'recentCalls' => CallRecord::with('lead')->where('user_id', auth()->id())->latest()->paginate(20), 'recommendation' => $lead ? $this->salesRecommendations->for($lead) : null, 'websiteUrl' => $websiteUrl]);
+        return view('dialer.index', ['categories' => $this->primaryCategories(), 'session' => $session, 'recentCalls' => CallRecord::with('lead')->where('user_id', auth()->id())->latest()->paginate(20), 'recommendation' => $lead ? $this->salesRecommendations->for($lead) : null, 'websiteUrl' => $websiteUrl]);
     }
 
     public function start(Request $request)
@@ -104,5 +104,16 @@ class PowerDialerController extends Controller
         $url = preg_match('#^https?://#i', $website) ? $website : 'https://'.$website;
 
         return filter_var($url, FILTER_VALIDATE_URL) ? $url : null;
+    }
+
+    private function primaryCategories()
+    {
+        $query = Lead::whereNotNull('phone')->whereNotNull('category')->where('category', '!=', '');
+        if (DB::connection()->getDriverName() === 'mysql') {
+            return $query->selectRaw("TRIM(SUBSTRING_INDEX(category, ',', 1)) AS primary_category")
+                ->distinct()->orderBy('primary_category')->pluck('primary_category')->filter()->values();
+        }
+
+        return $query->distinct()->pluck('category')->map(fn ($category) => trim(explode(',', $category, 2)[0]))->filter()->unique()->sort()->values();
     }
 }

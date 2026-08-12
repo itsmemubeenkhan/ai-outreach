@@ -39,6 +39,14 @@ class PowerDialerTest extends TestCase
         $this->actingAs($other)->post(route('dialer.control', $session), ['action' => 'stop'])->assertForbidden();
     }
 
+    public function test_category_picker_shows_only_primary_category(): void
+    {
+        $user = User::factory()->create();
+        Lead::create(['business_name' => 'Duct Pro', 'phone' => '+15550000001', 'category' => 'Duct Cleaning,Home Services,HVAC']);
+
+        $this->actingAs($user)->get(route('dialer.index'))->assertOk()->assertSee('Duct Cleaning')->assertDontSee('Duct Cleaning,Home Services,HVAC');
+    }
+
     public function test_signed_zoom_completion_advances_the_active_session(): void
     {
         config(['zoom.webhook_secret' => 'test-secret']);

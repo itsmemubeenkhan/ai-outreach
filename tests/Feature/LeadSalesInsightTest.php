@@ -26,4 +26,17 @@ class LeadSalesInsightTest extends TestCase
         $this->actingAs(User::factory()->create())->getJson(route('leads.sales-insight', $lead))
             ->assertOk()->assertJsonPath('website.title', 'Acme Dental')->assertJsonPath('analysis.best_offer', 'Appointment website');
     }
+
+    public function test_lead_without_website_gets_runtime_ai_pitch_starters(): void
+    {
+        Cache::flush();
+        config(['ai.openrouter.key' => 'test-key']);
+        $starters = collect(range(1, 10))->map(fn ($number) => "Starter $number")->all();
+        Http::fake(['https://openrouter.ai/*' => Http::response(['choices' => [['message' => ['content' => json_encode(['summary' => 'No website is recorded.', 'best_offer' => 'New website', 'reasons' => ['Missing website'], 'website_findings' => ['No website available to audit'], 'opening_pitch' => 'Let us build your digital presence.', 'pitch_starters' => $starters, 'discovery_questions' => ['How do customers find you?'], 'cautions' => []])]]]])]);
+        $lead = Lead::create(['business_name' => 'Duct Pro', 'category' => 'Duct Cleaning']);
+
+        $this->actingAs(User::factory()->create())->getJson(route('leads.sales-insight', $lead))
+            ->assertOk()->assertJsonPath('website.status', 'missing')->assertJsonCount(10, 'analysis.pitch_starters');
+        Http::assertSentCount(1);
+    }
 }
