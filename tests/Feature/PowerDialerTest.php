@@ -22,7 +22,7 @@ class PowerDialerTest extends TestCase
         $session = DialerSession::first();
         $this->assertSame($first->id, $session->current_lead_id);
         $response = $this->actingAs($user)->postJson(route('dialer.dial', $session));
-        $response->assertOk()->assertJsonPath('dial_url', 'tel:+15550000001');
+        $response->assertOk()->assertJsonPath('dial_url', 'zoomphonecall://+15550000001');
         $callId = $response->json('call_id');
         $this->actingAs($user)->post(route('dialer.disposition', $callId), ['disposition' => 'answered', 'notes' => 'Spoke'])->assertRedirect();
         $this->assertNotSame($first->id, $session->refresh()->current_lead_id);

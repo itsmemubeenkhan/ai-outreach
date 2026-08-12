@@ -40,7 +40,10 @@ class PowerDialerController extends Controller
         abort_unless($dialerSession->status === 'active' && $dialerSession->currentLead?->phone, 422);
         $call = CallRecord::create(['dialer_session_id' => $dialerSession->id, 'lead_id' => $dialerSession->current_lead_id, 'user_id' => auth()->id(), 'uuid' => (string) Str::uuid(), 'phone_number' => $dialerSession->currentLead->phone, 'status' => 'dialing', 'started_at' => now()]);
 
-        return response()->json(['call_id' => $call->id, 'dial_url' => 'tel:'.preg_replace('/[^+0-9]/', '', $call->phone_number)]);
+        return response()->json([
+            'call_id' => $call->id,
+            'dial_url' => 'zoomphonecall://'.preg_replace('/[^+0-9]/', '', $call->phone_number),
+        ]);
     }
 
     public function disposition(Request $request, CallRecord $callRecord)
