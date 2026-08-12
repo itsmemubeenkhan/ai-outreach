@@ -30,7 +30,7 @@ class AuthenticatedSessionController extends Controller
 
         $destination = $request->user()->isAdmin() ? route('dashboard', absolute: false) : route('dialer.index', absolute: false);
 
-        return redirect()->intended($destination);
+        return redirect($destination);
     }
 
     /**
