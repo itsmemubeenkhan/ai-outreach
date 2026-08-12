@@ -18,7 +18,7 @@ class OpenRouterLeadAnalyst
             'model' => config('ai.openrouter.model'),
             'messages' => [['role' => 'system', 'content' => 'You are a concise B2B sales strategist. Ground every recommendation in supplied CRM and website evidence.'], ['role' => 'user', 'content' => $prompt]],
             'temperature' => 0.2,
-            'max_tokens' => 900,
+            'max_tokens' => 1800,
             'provider' => ['require_parameters' => true],
             'response_format' => [
                 'type' => 'json_schema',
@@ -44,7 +44,11 @@ class OpenRouterLeadAnalyst
         ]);
         if (! $response->successful()) throw new RuntimeException('AI provider returned HTTP '.$response->status().'.');
         $content = $response->json('choices.0.message.content');
-        $content = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', trim((string) $content));
+        if (is_array($content)) $content = collect($content)->pluck('text')->filter()->implode('');
+        $content = trim((string) $content);
+        $start = strpos($content, '{');
+        $end = strrpos($content, '}');
+        if ($start !== false && $end !== false) $content = substr($content, $start, $end - $start + 1);
         $result = json_decode($content, true);
         if (! is_array($result)) throw new RuntimeException('AI provider returned an invalid response.');
 
