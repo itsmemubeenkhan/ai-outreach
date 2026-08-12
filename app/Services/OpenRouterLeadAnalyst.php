@@ -19,6 +19,28 @@ class OpenRouterLeadAnalyst
             'messages' => [['role' => 'system', 'content' => 'You are a concise B2B sales strategist. Ground every recommendation in supplied CRM and website evidence.'], ['role' => 'user', 'content' => $prompt]],
             'temperature' => 0.2,
             'max_tokens' => 900,
+            'provider' => ['require_parameters' => true],
+            'response_format' => [
+                'type' => 'json_schema',
+                'json_schema' => [
+                    'name' => 'lead_sales_analysis',
+                    'strict' => true,
+                    'schema' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'summary' => ['type' => 'string'],
+                            'best_offer' => ['type' => 'string'],
+                            'reasons' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            'website_findings' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            'opening_pitch' => ['type' => 'string'],
+                            'discovery_questions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            'cautions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        ],
+                        'required' => ['summary','best_offer','reasons','website_findings','opening_pitch','discovery_questions','cautions'],
+                        'additionalProperties' => false,
+                    ],
+                ],
+            ],
         ]);
         if (! $response->successful()) throw new RuntimeException('AI provider returned HTTP '.$response->status().'.');
         $content = $response->json('choices.0.message.content');
