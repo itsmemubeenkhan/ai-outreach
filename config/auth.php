@@ -4,6 +4,12 @@ use App\Models\User;
 
 return [
 
+    'quick_login' => [
+        'enabled' => (bool) env('QUICK_LOGIN_ENABLED', false),
+        'email' => env('QUICK_LOGIN_EMAIL'),
+        'password' => env('QUICK_LOGIN_PASSWORD'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults
