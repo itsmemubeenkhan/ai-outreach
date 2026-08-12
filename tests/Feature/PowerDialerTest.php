@@ -44,7 +44,7 @@ class PowerDialerTest extends TestCase
         $user = User::factory()->create();
         Lead::create(['business_name' => 'Duct Pro', 'phone' => '+15550000001', 'category' => 'Duct Cleaning,Home Services,HVAC']);
 
-        $this->actingAs($user)->get(route('dialer.index'))->assertOk()->assertSee('Duct Cleaning')->assertDontSee('Duct Cleaning,Home Services,HVAC');
+        $this->actingAs($user)->get(route('dialer.index'))->assertOk()->assertSee('Duct Cleaning (1 lead)')->assertSee('All categories (1 lead)')->assertDontSee('Duct Cleaning,Home Services,HVAC');
     }
 
     public function test_signed_zoom_completion_advances_the_active_session(): void

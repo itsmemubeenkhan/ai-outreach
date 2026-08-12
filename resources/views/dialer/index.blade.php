@@ -4,7 +4,7 @@
         @if(!$session)
             <form method="POST" action="{{ route('dialer.start') }}" class="mx-auto max-w-xl rounded-2xl border bg-white p-7 shadow-sm">@csrf
                 <h2 class="font-black">Start a calling session</h2>
-                <label class="mt-5 block text-sm font-bold">Category<select name="category" class="mt-1 w-full rounded-xl border-slate-200"><option value="">All categories</option>@foreach($categories as $category)<option>{{ $category }}</option>@endforeach</select></label>
+                <label class="mt-5 block text-sm font-bold">Category<select name="category" class="mt-1 w-full rounded-xl border-slate-200"><option value="">All categories ({{ number_format($callableLeadCount) }} {{ Str::plural('lead', $callableLeadCount) }})</option>@foreach($categories as $category)<option value="{{ $category['name'] }}">{{ $category['name'] }} ({{ number_format($category['count']) }} {{ Str::plural('lead', $category['count']) }})</option>@endforeach</select></label>
                 <div class="mt-4 rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900"><strong>30-second research pause</strong><p class="mt-1 text-xs">After Zoom reports a call ended, the next lead and website load immediately. The next call starts after 30 seconds.</p></div>
                 <button class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-bold text-white">Start Dialer</button>
             </form>
