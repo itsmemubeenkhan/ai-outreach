@@ -6,24 +6,29 @@ use App\Models\CallRecord;
 use App\Models\DialerSession;
 use App\Models\Lead;
 use App\Services\DialerSessionService;
+use App\Services\LeadSalesRecommendationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PowerDialerController extends Controller
 {
-    public function __construct(private readonly DialerSessionService $dialerSessions) {}
+    public function __construct(private readonly DialerSessionService $dialerSessions, private readonly LeadSalesRecommendationService $salesRecommendations) {}
 
     public function index()
     {
-        return view('dialer.index', ['categories' => Lead::whereNotNull('phone')->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'), 'session' => DialerSession::with('currentLead')->where('user_id', auth()->id())->whereIn('status', ['active', 'paused'])->latest()->first(), 'recentCalls' => CallRecord::with('lead')->where('user_id', auth()->id())->latest()->paginate(20)]);
+        $session = DialerSession::with('currentLead')->where('user_id', auth()->id())->whereIn('status', ['active', 'paused'])->latest()->first();
+        $lead = $session?->currentLead;
+        $websiteUrl = $this->websiteUrl($lead?->website);
+
+        return view('dialer.index', ['categories' => Lead::whereNotNull('phone')->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'), 'session' => $session, 'recentCalls' => CallRecord::with('lead')->where('user_id', auth()->id())->latest()->paginate(20), 'recommendation' => $lead ? $this->salesRecommendations->for($lead) : null, 'websiteUrl' => $websiteUrl]);
     }
 
     public function start(Request $request)
     {
-        $data = $request->validate(['category' => 'nullable|string|max:120', 'auto_next_delay' => 'required|integer|min:3|max:30']);
+        $data = $request->validate(['category' => 'nullable|string|max:120']);
         DialerSession::where('user_id', $request->user()->id)->whereIn('status', ['active', 'paused'])->update(['status' => 'ended', 'ended_at' => now()]);
-        $session = DialerSession::create(['user_id' => $request->user()->id, 'category' => $data['category'] ?: null, 'filters' => ['category' => $data['category'] ?: null], 'status' => 'active', 'auto_next_delay' => $data['auto_next_delay'], 'started_at' => now()]);
+        $session = DialerSession::create(['user_id' => $request->user()->id, 'category' => $data['category'] ?: null, 'filters' => ['category' => $data['category'] ?: null], 'status' => 'active', 'auto_next_delay' => 30, 'started_at' => now()]);
         $this->dialerSessions->advance($session);
 
         return redirect()->route('dialer.index');
@@ -91,5 +96,13 @@ class PowerDialerController extends Controller
     private function owner(DialerSession $session): void
     {
         abort_unless($session->user_id === auth()->id(), 403);
+    }
+
+    private function websiteUrl(?string $website): ?string
+    {
+        if (! $website) return null;
+        $url = preg_match('#^https?://#i', $website) ? $website : 'https://'.$website;
+
+        return filter_var($url, FILTER_VALIDATE_URL) ? $url : null;
     }
 }

@@ -22,6 +22,7 @@ class PowerDialerTest extends TestCase
         $this->actingAs($user)->post(route('dialer.start'), ['category' => 'Dentists', 'auto_next_delay' => 5])->assertRedirect(route('dialer.index'));
         $session = DialerSession::first();
         $this->assertSame($first->id, $session->current_lead_id);
+        $this->assertSame(30, $session->auto_next_delay);
         $response = $this->actingAs($user)->postJson(route('dialer.dial', $session));
         $response->assertOk()->assertJsonPath('dial_url', 'zoomphonecall://+15550000001');
         $callId = $response->json('call_id');
