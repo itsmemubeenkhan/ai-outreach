@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\CallRecord;
 use App\Models\DialerSession;
 use App\Models\Lead;
+use App\Services\DialerSessionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class PowerDialerController extends Controller
 {
+    public function __construct(private readonly DialerSessionService $dialerSessions) {}
+
     public function index()
     {
         return view('dialer.index', ['categories' => Lead::whereNotNull('phone')->whereNotNull('category')->distinct()->orderBy('category')->pluck('category'), 'session' => DialerSession::with('currentLead')->where('user_id', auth()->id())->whereIn('status', ['active', 'paused'])->latest()->first(), 'recentCalls' => CallRecord::with('lead')->where('user_id', auth()->id())->latest()->paginate(20)]);
@@ -21,7 +24,7 @@ class PowerDialerController extends Controller
         $data = $request->validate(['category' => 'nullable|string|max:120', 'auto_next_delay' => 'required|integer|min:3|max:30']);
         DialerSession::where('user_id', $request->user()->id)->whereIn('status', ['active', 'paused'])->update(['status' => 'ended', 'ended_at' => now()]);
         $session = DialerSession::create(['user_id' => $request->user()->id, 'category' => $data['category'] ?: null, 'filters' => ['category' => $data['category'] ?: null], 'status' => 'active', 'auto_next_delay' => $data['auto_next_delay'], 'started_at' => now()]);
-        $this->advance($session);
+        $this->dialerSessions->advance($session);
 
         return redirect()->route('dialer.index');
     }
@@ -31,7 +34,9 @@ class PowerDialerController extends Controller
         $this->owner($dialerSession);
         $dialerSession->load('currentLead');
 
-        return response()->json(['status' => $dialerSession->status, 'lead' => $dialerSession->currentLead, 'calls_completed' => $dialerSession->calls_completed, 'delay' => $dialerSession->auto_next_delay]);
+        $latestCall = $dialerSession->callRecords()->latest()->first();
+
+        return response()->json(['status' => $dialerSession->status, 'lead' => $dialerSession->currentLead, 'calls_completed' => $dialerSession->calls_completed, 'delay' => $dialerSession->auto_next_delay, 'latest_call' => $latestCall?->only(['id', 'status', 'ended_at'])]);
     }
 
     public function dial(DialerSession $dialerSession)
@@ -51,14 +56,15 @@ class PowerDialerController extends Controller
         abort_unless($callRecord->user_id === auth()->id(), 403);
         $data = $request->validate(['disposition' => 'required|in:answered,no_answer,busy,callback,interested,wrong_number,not_interested', 'notes' => 'nullable|string|max:3000']);
         DB::transaction(function () use ($callRecord, $data) {
+            $shouldAdvance = $callRecord->session?->current_lead_id === $callRecord->lead_id;
             $callRecord->update(['status' => 'completed', 'disposition' => $data['disposition'], 'notes' => $data['notes'] ?? null, 'ended_at' => $callRecord->ended_at ?? now()]);
             $callRecord->lead->activities()->create(['type' => 'call_completed', 'description' => 'Call completed: '.str($data['disposition'])->replace('_', ' ')->title(), 'metadata' => ['call_record_id' => $callRecord->id]]);
             if (in_array($data['disposition'], ['callback', 'interested'], true)) {
                 $callRecord->lead->update(['lead_status' => 'interested']);
             }$session = $callRecord->session;
-            if ($session) {
+            if ($session && $shouldAdvance) {
                 $session->increment('calls_completed');
-                $this->advance($session);
+                $this->dialerSessions->advance($session);
             }
         });
 
@@ -76,23 +82,10 @@ class PowerDialerController extends Controller
         } elseif ($action === 'stop') {
             $dialerSession->update(['status' => 'ended', 'ended_at' => now(), 'current_lead_id' => null]);
         } else {
-            $this->advance($dialerSession);
+            $this->dialerSessions->advance($dialerSession);
         }
 
         return back();
-    }
-
-    private function advance(DialerSession $session): void
-    {
-        $query = Lead::whereNotNull('phone')->where('id', '>', $session->last_lead_id ?? 0)->whereNotIn('lead_status', ['unsubscribed', 'closed']);
-        if ($session->category) {
-            $query->where('category', $session->category);
-        }$lead = $query->orderBy('id')->first();
-        if (! $lead) {
-            $session->update(['status' => 'completed', 'ended_at' => now(), 'current_lead_id' => null]);
-
-            return;
-        }$session->update(['current_lead_id' => $lead->id, 'last_lead_id' => $lead->id]);
     }
 
     private function owner(DialerSession $session): void

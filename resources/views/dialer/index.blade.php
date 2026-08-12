@@ -1,1 +1,54 @@
-<x-app-layout><x-slot name="header"><h1 class="text-2xl font-bold">Power Dialer</h1><p class="text-sm text-slate-500">Category queue with Zoom/Windows phone launching and post-call CRM records.</p></x-slot><div class="p-5 lg:p-8">@if(!$session)<form method="POST" action="{{ route('dialer.start') }}" class="mx-auto max-w-xl rounded-2xl border bg-white p-7 shadow-sm">@csrf<h2 class="font-black">Start a calling session</h2><label class="mt-5 block text-sm font-bold">Category<select name="category" class="mt-1 w-full rounded-xl border-slate-200"><option value="">All categories</option>@foreach($categories as $category)<option>{{ $category }}</option>@endforeach</select></label><label class="mt-4 block text-sm font-bold">Delay before next call<input type="number" name="auto_next_delay" min="3" max="30" value="5" class="mt-1 w-full rounded-xl border-slate-200"><span class="mt-1 block text-xs font-normal text-slate-500">Seconds reserved for review. The browser will never dial without an explicit enabled session.</span></label><button class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-bold text-white">Start Dialer</button></form>@else<div class="mx-auto max-w-4xl"><div class="rounded-2xl bg-slate-950 p-7 text-white"><div class="flex justify-between"><div><div class="text-xs font-bold uppercase tracking-wider text-indigo-300">{{ $session->status }} · {{ $session->category?:'All categories' }}</div><h2 class="mt-2 text-3xl font-black">{{ $session->currentLead?->business_name?:'Queue complete' }}</h2><p class="mt-2 text-slate-300">{{ $session->currentLead?->contact_person }} · {{ $session->currentLead?->phone }}</p></div><div class="text-right"><div class="text-3xl font-black">{{ $session->calls_completed }}</div><div class="text-xs text-slate-400">calls completed</div></div></div>@if($session->currentLead&&$session->status==='active')<button id="dial-button" class="mt-7 rounded-xl bg-emerald-500 px-6 py-3 font-black text-slate-950">☎ Dial with Zoom</button>@endif<div class="mt-5 flex gap-2">@foreach(['pause','resume','skip','stop'] as $action)<form method="POST" action="{{ route('dialer.control',$session) }}">@csrf<input type="hidden" name="action" value="{{ $action }}"><button class="rounded-lg border border-white/20 px-3 py-2 text-xs font-bold">{{ ucfirst($action) }}</button></form>@endforeach</div></div><div id="disposition-panel" class="mt-5 hidden rounded-2xl border bg-white p-6"><h3 class="font-black">Call outcome</h3><form id="disposition-form" method="POST" class="mt-4 grid gap-3 md:grid-cols-2">@csrf<select name="disposition" class="rounded-xl border-slate-200">@foreach(['answered','no_answer','busy','callback','interested','wrong_number','not_interested'] as $value)<option value="{{ $value }}">{{ str($value)->replace('_',' ')->title() }}</option>@endforeach</select><input name="notes" placeholder="Call notes" class="rounded-xl border-slate-200"><button class="rounded-xl bg-slate-900 px-4 py-3 font-bold text-white md:col-span-2">Save & Load Next Lead</button></form></div></div>@endif<div class="mx-auto mt-8 max-w-4xl rounded-2xl border bg-white"><div class="border-b p-5 font-black">Recent calls</div>@forelse($recentCalls as $call)<div class="grid gap-2 border-b p-4 text-sm md:grid-cols-5"><strong>{{ $call->lead->business_name }}</strong><span>{{ $call->phone_number }}</span><span>{{ $call->disposition?:$call->status }}</span><span>{{ $call->duration_seconds?gmdate('i:s',$call->duration_seconds):'—' }}</span><span class="truncate">{{ $call->ai_summary?:str($call->summary_status)->replace('_',' ')->title() }}</span></div>@empty<div class="p-10 text-center text-slate-500">No calls recorded.</div>@endforelse<div class="p-4">{{ $recentCalls->links() }}</div></div></div>@if($session?->currentLead)<script>document.getElementById('dial-button')?.addEventListener('click',async()=>{const response=await fetch(@json(route('dialer.dial',$session)),{method:'POST',headers:{'X-CSRF-TOKEN':@json(csrf_token()),'Accept':'application/json'}});const data=await response.json();if(data.dial_url){document.getElementById('disposition-form').action=@json(url('/calls'))+'/'+data.call_id+'/disposition';document.getElementById('disposition-panel').classList.remove('hidden');window.location.href=data.dial_url;}});</script>@endif</x-app-layout>
+<x-app-layout>
+    <x-slot name="header"><h1 class="text-2xl font-bold">Power Dialer</h1><p class="text-sm text-slate-500">Category queue with Zoom auto-dial and post-call CRM records.</p></x-slot>
+    <div class="p-5 lg:p-8">
+        @if(!$session)
+            <form method="POST" action="{{ route('dialer.start') }}" class="mx-auto max-w-xl rounded-2xl border bg-white p-7 shadow-sm">@csrf
+                <h2 class="font-black">Start a calling session</h2>
+                <label class="mt-5 block text-sm font-bold">Category<select name="category" class="mt-1 w-full rounded-xl border-slate-200"><option value="">All categories</option>@foreach($categories as $category)<option>{{ $category }}</option>@endforeach</select></label>
+                <label class="mt-4 block text-sm font-bold">Delay before next call<input type="number" name="auto_next_delay" min="3" max="30" value="5" class="mt-1 w-full rounded-xl border-slate-200"><span class="mt-1 block text-xs font-normal text-slate-500">After Zoom reports that the call ended, the next call starts after this delay.</span></label>
+                <button class="mt-6 w-full rounded-xl bg-indigo-600 py-3 font-bold text-white">Start Dialer</button>
+            </form>
+        @else
+            <div class="mx-auto max-w-4xl">
+                <div class="rounded-2xl bg-slate-950 p-7 text-white">
+                    <div class="flex justify-between"><div><div class="text-xs font-bold uppercase tracking-wider text-indigo-300">{{ $session->status }} · {{ $session->category ?: 'All categories' }}</div><h2 class="mt-2 text-3xl font-black">{{ $session->currentLead?->business_name ?: 'Queue complete' }}</h2><p class="mt-2 text-slate-300">{{ $session->currentLead?->contact_person }} · {{ $session->currentLead?->phone }}</p></div><div class="text-right"><div class="text-3xl font-black">{{ $session->calls_completed }}</div><div class="text-xs text-slate-400">calls completed</div></div></div>
+                    @if($session->currentLead && $session->status === 'active')<button id="dial-button" class="mt-7 rounded-xl bg-emerald-500 px-6 py-3 font-black text-slate-950 disabled:opacity-60">☎ Dial with Zoom</button><p id="dialer-status" class="mt-3 text-xs text-slate-300"></p>@endif
+                    <div class="mt-5 flex gap-2">@foreach(['pause','resume','skip','stop'] as $action)<form method="POST" action="{{ route('dialer.control', $session) }}">@csrf<input type="hidden" name="action" value="{{ $action }}"><button class="rounded-lg border border-white/20 px-3 py-2 text-xs font-bold">{{ ucfirst($action) }}</button></form>@endforeach</div>
+                </div>
+                <div id="disposition-panel" class="mt-5 hidden rounded-2xl border bg-white p-6"><h3 class="font-black">Call outcome</h3><form id="disposition-form" method="POST" class="mt-4 grid gap-3 md:grid-cols-2">@csrf<select name="disposition" class="rounded-xl border-slate-200">@foreach(['answered','no_answer','busy','callback','interested','wrong_number','not_interested'] as $value)<option value="{{ $value }}">{{ str($value)->replace('_',' ')->title() }}</option>@endforeach</select><input name="notes" placeholder="Call notes" class="rounded-xl border-slate-200"><button class="rounded-xl bg-slate-900 px-4 py-3 font-bold text-white md:col-span-2">Save & Load Next Lead</button></form></div>
+            </div>
+        @endif
+        <div class="mx-auto mt-8 max-w-4xl rounded-2xl border bg-white"><div class="border-b p-5 font-black">Recent calls</div>@forelse($recentCalls as $call)<div class="grid gap-2 border-b p-4 text-sm md:grid-cols-5"><strong>{{ $call->lead->business_name }}</strong><span>{{ $call->phone_number }}</span><span>{{ $call->disposition ?: $call->status }}</span><span>{{ $call->duration_seconds ? gmdate('i:s', $call->duration_seconds) : '—' }}</span><span class="truncate">{{ $call->ai_summary ?: str($call->summary_status)->replace('_',' ')->title() }}</span></div>@empty<div class="p-10 text-center text-slate-500">No calls recorded.</div>@endforelse<div class="p-4">{{ $recentCalls->links() }}</div></div>
+    </div>
+    @if($session?->currentLead)
+        <script>
+            const dialButton = document.getElementById('dial-button');
+            let activeCallId = null;
+            let pollTimer = null;
+            const dial = async () => {
+                dialButton.disabled = true;
+                document.getElementById('dialer-status').textContent = 'Calling in Zoom…';
+                const response = await fetch(@json(route('dialer.dial', $session)), {method:'POST', headers:{'X-CSRF-TOKEN':@json(csrf_token()), 'Accept':'application/json'}});
+                const data = await response.json();
+                if (data.dial_url) {
+                    activeCallId = data.call_id;
+                    document.getElementById('disposition-form').action = @json(url('/calls'))+'/'+data.call_id+'/disposition';
+                    document.getElementById('disposition-panel').classList.remove('hidden');
+                    window.location.href = data.dial_url;
+                    pollTimer = setInterval(checkCallState, 2000);
+                } else { dialButton.disabled = false; }
+            };
+            const checkCallState = async () => {
+                const response = await fetch(@json(route('dialer.state', $session)), {headers:{'Accept':'application/json'}});
+                const data = await response.json();
+                if (activeCallId && data.latest_call?.id === activeCallId && data.latest_call.status === 'completed') {
+                    clearInterval(pollTimer);
+                    document.getElementById('dialer-status').textContent = `Call ended. Next call in ${data.delay} seconds…`;
+                    setTimeout(() => window.location.href = @json(route('dialer.index')).concat('?auto=1'), data.delay * 1000);
+                }
+            };
+            dialButton?.addEventListener('click', dial);
+            if (new URLSearchParams(window.location.search).get('auto') === '1') setTimeout(() => dialButton?.click(), 500);
+        </script>
+    @endif
+</x-app-layout>
