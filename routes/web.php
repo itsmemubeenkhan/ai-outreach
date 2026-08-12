@@ -19,11 +19,11 @@ use App\Http\Controllers\UnsubscribeController;
 use App\Http\Controllers\ZoomWebhookController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/', fn () => auth()->check() && ! auth()->user()->isAdmin() ? redirect()->route('dialer.index') : redirect()->route('dashboard'));
 Route::get('/unsubscribe', UnsubscribeController::class)->middleware('throttle:30,1')->name('unsubscribe');
 Route::post('/webhooks/zoom-phone', ZoomWebhookController::class)->middleware('throttle:120,1')->name('zoom.webhook');
 
-Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
+Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified', 'admin'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/dialer/{dialerSession}/dial', [PowerDialerController::class, 'dial'])->name('dialer.dial');
     Route::post('/dialer/{dialerSession}/control', [PowerDialerController::class, 'control'])->name('dialer.control');
     Route::post('/calls/{callRecord}/disposition', [PowerDialerController::class, 'disposition'])->name('dialer.disposition');
+    Route::middleware('admin')->group(function () {
     Route::get('/inbox', [InboxController::class, 'index'])->name('inbox.index');
     Route::get('/inbox/{inboundMessage}', [InboxController::class, 'show'])->name('inbox.show');
     Route::post('/inbox/{inboundMessage}/action', [InboxController::class, 'action'])->name('inbox.action');
@@ -61,6 +62,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/imports', [LeadImportController::class, 'index'])->name('imports.index');
     Route::post('/imports/preview', [LeadImportController::class, 'preview'])->name('imports.preview');
     Route::post('/imports', [LeadImportController::class, 'store'])->name('imports.store');
+    });
 });
 
 require __DIR__.'/auth.php';

@@ -1,9 +1,14 @@
 <aside class="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-slate-950 text-slate-300 lg:flex">
     <div class="flex h-20 items-center gap-3 border-b border-white/10 px-6"><div class="grid h-10 w-10 place-items-center rounded-xl bg-indigo-500 font-black text-white">AI</div><div><div class="font-bold text-white">Outreach CRM</div><div class="text-xs text-slate-500">Pipeline command</div></div></div>
-    @php $items=[['dashboard','Dashboard','◈'],['leads.index','Leads','◎'],['dialer.index','Power Dialer','☎'],['imports.index','Imports','⇧'],['campaigns.index','Campaigns','◇'],['sending-accounts.index','Sending Accounts','✉'],['outbound-emails.index','Outbound Log','↗'],['inbox.index','Inbox','↩'],['hot-leads.index','Hot Leads','🔥'],['tasks.index','Tasks','✓'],['suppressions.index','Suppression List','⊘']]; $soon=['Settings']; @endphp
+    @php
+        $items = auth()->user()->isAdmin()
+            ? [['dashboard','Dashboard','◈'],['leads.index','Leads','◉'],['dialer.index','Power Dialer','☎'],['imports.index','Imports','⇧'],['campaigns.index','Campaigns','◇'],['sending-accounts.index','Sending Accounts','✉'],['outbound-emails.index','Outbound Log','↗'],['inbox.index','Inbox','↩'],['hot-leads.index','Hot Leads','🔥'],['tasks.index','Tasks','✓'],['suppressions.index','Suppression List','⊘']]
+            : [['leads.index','Leads','◉'],['dialer.index','Power Dialer','☎']];
+        $soon = auth()->user()->isAdmin() ? ['Settings'] : [];
+    @endphp
     <nav class="flex-1 space-y-1 overflow-y-auto p-4">
         @foreach($items as [$route,$label,$icon])<a href="{{ route($route) }}" class="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold {{ request()->routeIs(str_replace('.index','.*',$route)) || request()->routeIs($route) ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-950/30' : 'hover:bg-white/5 hover:text-white' }}"><span>{{ $icon }}</span>{{ $label }}</a>@endforeach
-        <div class="px-4 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[.2em] text-slate-600">Phase 1 roadmap</div>
+        @if($soon)<div class="px-4 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[.2em] text-slate-600">Phase 1 roadmap</div>@endif
         @foreach($soon as $label)<div class="flex items-center justify-between rounded-xl px-4 py-2.5 text-sm text-slate-500"><span>{{ $label }}</span><span class="rounded bg-white/5 px-1.5 py-0.5 text-[9px]">SOON</span></div>@endforeach
     </nav>
 </aside>
