@@ -2,21 +2,6 @@
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    @if (config('auth.quick_login.enabled') && config('auth.quick_login.email') && config('auth.quick_login.password'))
-        <div class="mb-5 rounded-xl border border-indigo-200 bg-indigo-50 p-4">
-            <p class="text-sm font-semibold text-indigo-950">Quick admin access</p>
-            <p class="mt-1 text-xs text-indigo-700">Copy the login credentials and fill the form automatically.</p>
-            <button
-                type="button"
-                id="copy-admin-login"
-                class="mt-3 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-                Copy Login Credentials
-            </button>
-            <p id="copy-login-status" class="mt-2 hidden text-xs font-medium text-emerald-700" role="status"></p>
-        </div>
-    @endif
-
     <form method="POST" action="{{ route('login') }}">
         @csrf
 
@@ -60,29 +45,4 @@
         </div>
     </form>
 
-    @if (config('auth.quick_login.enabled') && config('auth.quick_login.email') && config('auth.quick_login.password'))
-        <script>
-            document.getElementById('copy-admin-login').addEventListener('click', async () => {
-                const email = @js(config('auth.quick_login.email'));
-                const password = @js(config('auth.quick_login.password'));
-                const status = document.getElementById('copy-login-status');
-
-                document.getElementById('email').value = email;
-                document.getElementById('password').value = password;
-                document.getElementById('remember_me').checked = true;
-                document.getElementById('email').dispatchEvent(new Event('input', { bubbles: true }));
-                document.getElementById('password').dispatchEvent(new Event('input', { bubbles: true }));
-
-                try {
-                    await navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`);
-                    status.textContent = 'Credentials copied and filled.';
-                } catch (error) {
-                    status.textContent = 'Credentials filled. Clipboard access was unavailable.';
-                }
-
-                status.classList.remove('hidden');
-                document.querySelector('button[type="submit"]').focus();
-            });
-        </script>
-    @endif
 </x-guest-layout>
