@@ -25,6 +25,9 @@
 - Stream-safe plain-text template rendering and functional signed unsubscribe links
 - Production-safe suppression list and automatic campaign stopping on unsubscribe
 - Scheduler dispatch command, campaign delivery metrics, sending-account health UI, and paginated outbound log
+- Direct Zoom calling from the Leads table with webhook-driven completion detection
+- Required post-call outcome/summary modal, latest call timestamp and notes on each lead row
+- User-owned dated follow-up tasks with automatic in-app due alerts
 - Pure-PHP IMAP reply polling with per-mailbox queued jobs, UID cursors, health errors, and overlap protection
 - Header-first reply matching with conservative sender/account fallback and unmatched-message preservation
 - Idempotent inbound message storage and immediate reply-based campaign stopping before classification

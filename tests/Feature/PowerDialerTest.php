@@ -65,4 +65,39 @@ class PowerDialerTest extends TestCase
         $this->assertSame($second->id, $session->refresh()->current_lead_id);
         $this->assertSame(1, $session->calls_completed);
     }
+
+    public function test_lead_can_be_called_directly_and_saved_with_follow_up(): void
+    {
+        $user = User::factory()->create(['role' => 'dialer']);
+        $lead = Lead::create(['business_name' => 'Direct Lead', 'phone' => '+15550000009']);
+
+        $response = $this->actingAs($user)->postJson(route('leads.call', $lead));
+        $response->assertOk()->assertJsonPath('dial_url', 'zoomphonecall://+15550000009');
+        $call = CallRecord::findOrFail($response->json('call_id'));
+        $call->update(['status' => 'completed', 'ended_at' => now()]);
+
+        $dueAt = now()->addDay()->startOfMinute();
+        $this->actingAs($user)->postJson(route('calls.complete', $call), [
+            'disposition' => 'callback', 'notes' => 'Owner requested pricing tomorrow.',
+            'follow_up' => true, 'follow_up_at' => $dueAt->toDateTimeString(),
+        ])->assertOk();
+
+        $this->assertDatabaseHas('call_records', ['id' => $call->id, 'notes' => 'Owner requested pricing tomorrow.', 'disposition' => 'callback']);
+        $this->assertDatabaseHas('tasks', ['lead_id' => $lead->id, 'user_id' => $user->id, 'call_record_id' => $call->id, 'status' => 'open']);
+        $this->actingAs($user)->get(route('leads.index'))->assertOk()->assertSee('Owner requested pricing tomorrow.')->assertSee('Call Now');
+
+        $lead->tasks()->update(['due_at' => now()->subMinute()]);
+        $this->actingAs($user)->getJson(route('follow-ups.due'))->assertOk()->assertJsonPath('tasks.0.lead', 'Direct Lead');
+    }
+
+    public function test_user_cannot_view_or_complete_another_users_direct_call(): void
+    {
+        $owner = User::factory()->create();
+        $other = User::factory()->create();
+        $lead = Lead::create(['business_name' => 'Private Lead', 'phone' => '+15550000008']);
+        $call = CallRecord::create(['lead_id' => $lead->id, 'user_id' => $owner->id, 'uuid' => fake()->uuid(), 'phone_number' => $lead->phone, 'status' => 'completed']);
+
+        $this->actingAs($other)->getJson(route('calls.state', $call))->assertForbidden();
+        $this->actingAs($other)->postJson(route('calls.complete', $call), ['disposition' => 'answered', 'notes' => 'No'])->assertForbidden();
+    }
 }

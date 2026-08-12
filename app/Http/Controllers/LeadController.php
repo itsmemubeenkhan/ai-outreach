@@ -13,7 +13,7 @@ class LeadController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Lead::query();
+        $query = Lead::query()->with('latestCall');
         foreach (['category', 'country', 'state', 'city', 'email_status', 'phone_type', 'lead_status', 'source'] as $filter) {
             $query->when($request->filled($filter), fn ($q) => $q->where($filter, $request->string($filter)));
         }

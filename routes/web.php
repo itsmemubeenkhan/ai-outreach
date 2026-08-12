@@ -30,6 +30,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     Route::resource('leads', LeadController::class)->except(['show']);
+    Route::post('/leads/{lead}/calls', [PowerDialerController::class, 'callLead'])->name('leads.call');
+    Route::get('/calls/{callRecord}/state', [PowerDialerController::class, 'callState'])->name('calls.state');
+    Route::post('/calls/{callRecord}/complete', [PowerDialerController::class, 'completeCall'])->name('calls.complete');
+    Route::post('/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
+    Route::get('/follow-ups/due', [TaskController::class, 'due'])->name('follow-ups.due');
     Route::get('/leads/{lead}/sales-insight', LeadSalesInsightController::class)->middleware('throttle:20,1')->name('leads.sales-insight');
     Route::get('/dialer', [PowerDialerController::class, 'index'])->name('dialer.index');
     Route::post('/dialer/start', [PowerDialerController::class, 'start'])->name('dialer.start');
@@ -44,7 +49,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/inbox/{inboundMessage}/task', [InboxController::class, 'task'])->name('inbox.task');
     Route::get('/hot-leads', [HotLeadController::class, 'index'])->name('hot-leads.index');
     Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
-    Route::post('/tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
     Route::resource('sending-accounts', SendingAccountController::class);
     Route::post('/sending-accounts/{sendingAccount}/test-smtp', [SendingAccountTestController::class, 'smtp'])->middleware('throttle:10,1')->name('sending-accounts.test-smtp');
     Route::post('/sending-accounts/{sendingAccount}/test-imap', [SendingAccountTestController::class, 'imap'])->middleware('throttle:10,1')->name('sending-accounts.test-imap');

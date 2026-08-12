@@ -56,6 +56,55 @@ class PowerDialerController extends Controller
         ]);
     }
 
+    public function callLead(Lead $lead)
+    {
+        abort_unless(filled($lead->phone), 422, 'This lead does not have a phone number.');
+        $call = CallRecord::create([
+            'lead_id' => $lead->id,
+            'user_id' => auth()->id(),
+            'uuid' => (string) Str::uuid(),
+            'phone_number' => $lead->phone,
+            'status' => 'dialing',
+            'started_at' => now(),
+        ]);
+
+        return response()->json(['call_id' => $call->id, 'dial_url' => 'zoomphonecall://'.preg_replace('/[^+0-9]/', '', $lead->phone)]);
+    }
+
+    public function callState(CallRecord $callRecord)
+    {
+        abort_unless($callRecord->user_id === auth()->id(), 403);
+
+        return response()->json($callRecord->only(['id', 'status', 'started_at', 'ended_at']));
+    }
+
+    public function completeCall(Request $request, CallRecord $callRecord)
+    {
+        abort_unless($callRecord->user_id === auth()->id(), 403);
+        $data = $request->validate([
+            'disposition' => 'required|in:answered,no_answer,busy,callback,interested,wrong_number,not_interested',
+            'notes' => 'required|string|max:3000',
+            'follow_up' => 'nullable|boolean',
+            'follow_up_at' => 'nullable|required_if:follow_up,1|date|after:now',
+        ]);
+
+        DB::transaction(function () use ($callRecord, $data) {
+            $endedAt = $callRecord->ended_at ?? now();
+            $callRecord->update(['status' => 'completed', 'disposition' => $data['disposition'], 'notes' => $data['notes'], 'ended_at' => $endedAt]);
+            $callRecord->lead->update(['last_contacted_at' => $endedAt, 'next_follow_up_at' => ! empty($data['follow_up']) ? $data['follow_up_at'] : $callRecord->lead->next_follow_up_at]);
+            $callRecord->lead->activities()->create(['type' => 'call_completed', 'description' => 'Call completed: '.str($data['disposition'])->replace('_', ' ')->title(), 'metadata' => ['call_record_id' => $callRecord->id, 'notes' => $data['notes']]]);
+            if (! empty($data['follow_up'])) {
+                $callRecord->lead->tasks()->create([
+                    'user_id' => auth()->id(), 'call_record_id' => $callRecord->id,
+                    'title' => 'Follow up with '.($callRecord->lead->business_name ?: $callRecord->lead->phone),
+                    'notes' => $data['notes'], 'due_at' => $data['follow_up_at'], 'priority' => 'high', 'status' => 'open',
+                ]);
+            }
+        });
+
+        return response()->json(['message' => 'Call summary saved.', 'redirect' => route('leads.index')]);
+    }
+
     public function disposition(Request $request, CallRecord $callRecord)
     {
         abort_unless($callRecord->user_id === auth()->id(), 403);

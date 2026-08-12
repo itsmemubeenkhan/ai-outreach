@@ -32,4 +32,9 @@ class Lead extends Model
     {
         return $this->hasMany(CallRecord::class);
     }
+
+    public function latestCall()
+    {
+        return $this->hasOne(CallRecord::class)->latestOfMany('started_at');
+    }
 }

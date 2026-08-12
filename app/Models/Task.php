@@ -22,4 +22,14 @@ class Task extends Model
     {
         return $this->belongsTo(InboundMessage::class);
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function callRecord()
+    {
+        return $this->belongsTo(CallRecord::class);
+    }
 }
