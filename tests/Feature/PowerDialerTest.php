@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DialerSession;
+use App\Models\CallRecord;
 use App\Models\Lead;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,5 +36,24 @@ class PowerDialerTest extends TestCase
         $other = User::factory()->create();
         $session = DialerSession::create(['user_id' => $owner->id, 'status' => 'active']);
         $this->actingAs($other)->post(route('dialer.control', $session), ['action' => 'stop'])->assertForbidden();
+    }
+
+    public function test_signed_zoom_completion_advances_the_active_session(): void
+    {
+        config(['zoom.webhook_secret' => 'test-secret']);
+        $user = User::factory()->create();
+        $first = Lead::create(['business_name' => 'First', 'phone' => '+15550000001', 'category' => 'Dentists']);
+        $second = Lead::create(['business_name' => 'Second', 'phone' => '+15550000002', 'category' => 'Dentists']);
+        $session = DialerSession::create(['user_id' => $user->id, 'category' => 'Dentists', 'status' => 'active', 'current_lead_id' => $first->id, 'last_lead_id' => $first->id]);
+        $call = CallRecord::create(['dialer_session_id' => $session->id, 'lead_id' => $first->id, 'user_id' => $user->id, 'uuid' => fake()->uuid(), 'phone_number' => $first->phone, 'status' => 'dialing']);
+        $payload = json_encode(['event' => 'phone.caller_call_element_completed', 'payload' => ['object' => ['call_element' => ['call_id' => 'zoom-call-1', 'callee_number' => $first->phone, 'duration' => 12]]]], JSON_THROW_ON_ERROR);
+        $timestamp = (string) now()->timestamp;
+        $signature = 'v0='.hash_hmac('sha256', "v0:$timestamp:$payload", 'test-secret');
+
+        $this->call('POST', route('zoom.webhook'), [], [], [], ['HTTP_X_ZM_REQUEST_TIMESTAMP' => $timestamp, 'HTTP_X_ZM_SIGNATURE' => $signature, 'CONTENT_TYPE' => 'application/json'], $payload)->assertOk();
+
+        $this->assertSame('completed', $call->refresh()->status);
+        $this->assertSame($second->id, $session->refresh()->current_lead_id);
+        $this->assertSame(1, $session->calls_completed);
     }
 }

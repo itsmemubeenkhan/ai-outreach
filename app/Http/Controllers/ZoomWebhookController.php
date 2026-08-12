@@ -31,13 +31,13 @@ class ZoomWebhookController extends Controller
             $call = $query->latest()->first();
             if ($call) {
                 DB::transaction(function () use ($call, $payload) {
-                    $call->lockForUpdate()->refresh();
-                    if ($call->status !== 'dialing') {
+                    $lockedCall = CallRecord::query()->lockForUpdate()->find($call->id);
+                    if (! $lockedCall || $lockedCall->status !== 'dialing') {
                         return;
                     }
-                    $call->update(['provider_call_id' => $payload['call_id'] ?? $payload['call_element_id'] ?? $payload['id'] ?? null, 'status' => 'completed', 'duration_seconds' => $payload['duration'] ?? null, 'ended_at' => now(), 'provider_metadata' => $payload]);
-                    $session = $call->session;
-                    if ($session && $session->status === 'active' && $session->current_lead_id === $call->lead_id) {
+                    $lockedCall->update(['provider_call_id' => $payload['call_id'] ?? $payload['call_element_id'] ?? $payload['id'] ?? null, 'status' => 'completed', 'duration_seconds' => $payload['duration'] ?? null, 'ended_at' => now(), 'provider_metadata' => $payload]);
+                    $session = $lockedCall->session;
+                    if ($session && $session->status === 'active' && $session->current_lead_id === $lockedCall->lead_id) {
                         $session->increment('calls_completed');
                         $this->dialerSessions->advance($session);
                     }
