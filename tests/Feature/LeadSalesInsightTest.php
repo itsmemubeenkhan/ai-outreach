@@ -16,7 +16,7 @@ class LeadSalesInsightTest extends TestCase
     public function test_runtime_insight_uses_website_content_and_openrouter(): void
     {
         Cache::flush();
-        config(['ai.openrouter.key' => 'test-key', 'ai.openrouter.model' => 'openrouter/auto']);
+        config(['ai.openrouter.key' => 'test-key', 'ai.openrouter.model' => 'google/gemini-2.5-flash-lite']);
         Http::fake([
             'https://example.com' => Http::response('<html><head><title>Acme Dental</title><meta name="description" content="Family dental care"></head><body><h1>Book a dentist</h1><p>Appointments and cosmetic dentistry.</p></body></html>'),
             'https://openrouter.ai/*' => Http::response(['choices' => [['message' => ['content' => json_encode(['summary' => 'Dental practice', 'best_offer' => 'Appointment website', 'reasons' => ['Booking signal'], 'website_findings' => ['Clear service'], 'opening_pitch' => 'Improve bookings', 'discovery_questions' => ['How are bookings handled?'], 'cautions' => []])]]]]),
