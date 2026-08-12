@@ -33,4 +33,21 @@ class LeadImportTest extends TestCase
         $this->assertSame(2, $import->refresh()->imported_rows);
         $this->assertSame(1, $import->rejected_rows);
     }
+
+    public function test_import_can_apply_a_default_category(): void
+    {
+        Storage::fake('local');
+        Storage::disk('local')->put('imports/dealers.csv', "business,phone\nDealer One,+1 737-555-0100\n");
+        $import = LeadImport::create([
+            'user_id' => User::factory()->create()->id,
+            'original_filename' => 'dealers.csv',
+            'stored_path' => 'imports/dealers.csv',
+            'column_mapping' => [0 => 'business_name', 1 => 'phone', '_defaults' => ['category' => 'Car Dealership']],
+            'status' => 'queued',
+        ]);
+
+        (new ProcessLeadImport($import->id))->handle();
+
+        $this->assertDatabaseHas('leads', ['business_name' => 'Dealer One', 'category' => 'Car Dealership']);
+    }
 }

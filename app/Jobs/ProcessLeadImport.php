@@ -36,6 +36,8 @@ class ProcessLeadImport implements ShouldQueue
         $file->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY | \SplFileObject::DROP_NEW_LINE);
         $headers = array_map('trim', $file->fgetcsv() ?: []);
         $mapping = $import->column_mapping;
+        $defaults = is_array($mapping['_defaults'] ?? null) ? $mapping['_defaults'] : [];
+        unset($mapping['_defaults']);
         $buffer = [];
         $processed = 0;
         $imported = 0;
@@ -53,6 +55,9 @@ class ProcessLeadImport implements ShouldQueue
                 }
             }
             $data = array_map(fn ($v) => $v === '' ? null : $v, $data);
+            foreach (array_intersect_key($defaults, array_flip(self::FIELDS)) as $field => $value) {
+                if (blank($data[$field] ?? null) && filled($value)) $data[$field] = trim((string) $value);
+            }
             if (! empty($data['email'])) {
                 $data['email'] = strtolower($data['email']);
             }
